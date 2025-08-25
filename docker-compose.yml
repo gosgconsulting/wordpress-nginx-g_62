@@ -1,0 +1,54 @@
+services:
+  db:
+    image: mariadb:11
+    volumes:
+      - "db-data:/var/lib/mysql"
+      - "./config/my.cnf:/etc/mysql/conf.d/custom.cnf:ro"
+    environment:
+      MYSQL_ROOT_PASSWORD: wordpress
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+
+  valkey:
+    image: valkey/valkey:latest
+    restart: unless-stopped
+    # Internal service only; no host port exposure needed
+
+  wordpress:
+    depends_on:
+      - db
+      - valkey
+    build: ./
+    volumes:
+      - "site-data:/var/www/wp-content"
+    ports:
+      - "8123:80"
+    environment:
+      DB_HOST: db
+      DB_PASSWORD: wordpress
+      DB_NAME: wordpress
+      DB_USER: wordpress
+      WORDPRESS_SITE_URL: http://localhost:8123
+      FS_METHOD: direct
+      # Object cache (Valkey/Redis-compatible)
+      WP_REDIS_HOST: valkey
+      WP_REDIS_PORT: "6379"
+      WP_REDIS_CLIENT: phpredis
+      # Optional: set a cache key salt to isolate environments (hostname by default if omitted)
+      # WP_CACHE_KEY_SALT: local-
+      # For debugging only:
+      #WP_DEBUG: "true"
+      #WP_DEBUG_DISPLAY: "true"
+
+volumes:
+  db-data:
+  site-data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.91.0/24
